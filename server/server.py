@@ -14,10 +14,10 @@ try:
 except:
     pass
 directory = os.getcwd()
-
+active = 0
 @app.get("/")
 async def landing():
-    return {"message":"welcome..."}
+    return {"status":0,"message":"welcome...", "active":active}
 
 class CompileRequest(BaseModel):
     filename: str
@@ -32,8 +32,10 @@ class CompileResponse(BaseModel):
     message: str # compiler output
     success: bool # True if successful
 
+# This endpoint simply performs a compile and sends back all the debugging layers from cxmlc
 @app.post("/compile/")
 async def start_compile(cr: CompileRequest) -> CompileResponse:
+    global active
     path = os.path.join(directory, cr.id)
     shutil.rmtree(path,True)
     os.mkdir(path)
@@ -43,6 +45,7 @@ async def start_compile(cr: CompileRequest) -> CompileResponse:
         f.write(cr.content+"\n")
     env = os.environ.copy()
     env["CXMLC_CONFIG"] = "/app/config.ini"
+    active += 1
     proc = await asyncio.create_subprocess_exec("/app/wrappercc.py","./test.c", stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE, env=env, cwd=path)
     stdout, stderr = await proc.communicate()
@@ -62,4 +65,5 @@ async def start_compile(cr: CompileRequest) -> CompileResponse:
             response.xml = [f.read()]
         with open(os.path.join(path, "cxmlc", "final.c"),"r") as f:
             response.final = f.read()
+    active -=1
     return response
